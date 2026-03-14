@@ -1,0 +1,6 @@
+Before running the script you have to download raspotify:
+sudo apt-get -y install curl && curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
+https://github.com/dtcooper/raspotify/wiki/Basic-Setup-Guide
+
+Download Spotify Web API library for Python:
+pip install spotipy --upgrade
