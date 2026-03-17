@@ -1,12 +1,14 @@
 from spotify_setup import sp, pi_device_id
 import time
-def spotify_play_request(user_req,request_type):
+
+#Input of user request and song/playlist option (defaults to song if no second input)
+def spotify_play_request(user_req,request_type="song"):
     if not pi_device_id:
         print("Device ID not found, cannot play.")
         return "Spotify device unavailable"
 
     #Song
-    if request_type == 'song':
+    if request_type == "song":
         
         print(f"Searching for: {user_req}")
 
@@ -39,7 +41,7 @@ def spotify_play_request(user_req,request_type):
         return f"{track_name} by {artist_name}"
 
     #Playlist
-    elif request_type == 'playlist':
+    elif request_type == "playlist":
 
       print(f"Searching for playlist: '{user_req}'...")
     
@@ -51,7 +53,7 @@ def spotify_play_request(user_req,request_type):
         print(f"Spotify Search Error: {e}")
         return "Error searching Spotify"
 
-      # Filter out any None values that the Spotify API might return
+      #Check if a valid playlist is found
       valid_playlists = [p for p in playlists if p is not None]
       if not valid_playlists:
           print("No playlist found.")
@@ -93,6 +95,7 @@ def previous_song():
 
 #Current song
 def current_song():
+    #Delay from user to server
     time.sleep(1)
     try:
         current = sp.current_playback()
