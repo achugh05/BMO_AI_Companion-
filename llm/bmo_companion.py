@@ -15,28 +15,187 @@ from PIL import Image, ImageTk
 import random
 
 
-class BMOChat:
-    def __init__(self, model_name: str = "json_llama_bmo"):
+# ================================================================================================================================
+                                                 # BMOFace Class: Handles Face Animations
+# ================================================================================================================================
+
+class BMOFace:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("BMO OS v1.0")
+        self.root.geometry("800x480")
+        self.bmo_color = "#73AF9C"
+        self.root.configure(bg=self.bmo_color)
         
+        self.canvas = tk.Canvas(self.root, width=800, height=480, bg=self.bmo_color, highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+        
+        #KILL KEY
+        self.root.bind("<Escape>", lambda e: os._exit(0))
+
+        # Load Animation Library
+        self.animations = {
+            "idle": self.load_frames("idle"),
+            "talking": self.load_frames("talking"),
+            "thinking": self.load_frames("thinking"),
+            "sleeping": self.load_frames("sleeping")
+        }
+
+        self.current_state = "sleeping"
+        self.face_sprite = self.canvas.create_image(400, 240)
+        self.current_img_ref = None
+        
+        self.animate()
+
+    def load_frames(self, folder_name):
+        frames = []
+        path = os.path.join("assets", folder_name)
+        if os.path.exists(path):
+            files = sorted([f for f in os.listdir(path) if f.endswith(('.png', '.jpg'))])
+            for f in files:
+                img = Image.open(os.path.join(path, f)).resize((800, 480), Image.Resampling.LANCZOS)
+                frames.append(ImageTk.PhotoImage(img))
+        return frames
+
+    def set_state(self, new_state):
+        if new_state in self.animations:
+            self.current_state = new_state
+
+    def animate(self):
+        current_frames = self.animations.get(self.current_state, [])
+        if current_frames:
+            next_image = random.choice(current_frames)
+            self.canvas.itemconfig(self.face_sprite, image=next_image)
+            self.current_img_ref = next_image
+
+        # Timing based on state
+        if self.current_state == "sleeping": 
+            delay = random.randint(1500, 2500)
+        elif self.current_state == "idle":
+            delay = random.randint(1000, 2000)
+        elif self.current_state == "thinking": 
+            delay = random.randint(1000, 2000)
+        elif self.current_state == "talking": 
+            delay = random.randint(150, 500)
+        else: 
+            delay = 2000
+        
+        self.root.after(delay, self.animate)
+        
+# ================================================================================================================================
+                                    # BMOChat Class: Handles Ollama, User Inputs, and TTS Queue
+# ================================================================================================================================
+
+class BMOChat:
+    def __init__(self, face_canvas, model_name: str = "json_llama_bmo"):
+        
+        self.face = face_canvas     
         self.model_name = model_name
         self.client = ollama.Client()
         self.conversation_history = []
         
-
         # Get the absolute path of the current script (llm/bmo_companion.py)
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        
+
         # Go up one level to project root, then into the piper folder
         self.piper_path = os.path.normpath(os.path.join(current_dir, "..", "piper", "piper", "piper.exe"))
         self.voice_model = os.path.normpath(os.path.join(current_dir, "..", "piper", "en_US-libritts_r-medium.onnx"))
 
+        #tts initialization
         self.tts_queue = queue.Queue()
         self.stop_tts = threading.Event()
-        self.speaker_thread = threading.Thread(target=self._tts_worker, daemon=True)
-        self.speaker_thread.start()
         self.text_buffer = ""
         self.mute_tts = False;
+        
+        self.speaker_thread = threading.Thread(target=self._tts_worker, daemon=True)
+        self.speaker_thread.start()
+        
+# ================================================================================================================================
+                                    # BMOChat user input handler, warmup function, and json handler
+# ================================================================================================================================
+        
+    def ask_bmo(self, user_input: str) -> str:
+        """handles initial user input"""
+        
+        # TRIGGER: Start Thinking
+        self.face.set_state("thinking")
+        
+        self.conversation_history.append({'role': 'user', 'content': user_input})
+
+        try:
+            # Get the first response (could be text or a JSON tool request)
+            stream = self.client.chat(
+                model=self.model_name,
+                messages=self.conversation_history,
+                stream=True, 
+            )
+
+            full_response = ""
+            
+            for chunk in stream:
+                content = chunk.message.content
+                full_response += content   
+                print(content, end="", flush=True)
+                self.process_for_tts(content)
+
+            # Flush any remaining text in the buffer
+            self.process_for_tts("", final=True)
+            self.conversation_history.append({'role': 'assistant', 'content': full_response})
+            
+            # Check for JSON
+            action, value = self.handle_json_from_bmo(full_response)
+            
+            # If BMO asked for a tool, execute it
+            if action:
+                self.handle_tool_request(action, value, user_input)
+
+        except Exception as e:
+            print(f"\n[DEBUG] error in ask_bmo: {str(e)}")
     
+    def handle_json_from_bmo(self, raw_text: str):
+    # Parses BMO's output and extracts the core tool data.
+    
+        try:
+            # Find the actual JSON block (ignores extra brackets or preamble text)
+            match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
+            if not match:
+                return None, None
+            
+            json_str = match.group(1).strip()
+            
+            # Fix common "extra bracket" or "trailing comma" issues
+            # Remove trailing commas before a closing bracket
+            json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
+            
+            # Attempt to parse
+            data = json.loads(json_str)
+            return data.get("action"), data.get("value")
+        
+        except Exception as e:
+            print(f"[DEBUG] Error parsing json: {e}")
+            return None, None
+     
+    def warmup(self):
+        #Loads the model into RAM by sending an empty request. 
+        #The keep_alive=-1 ensures it stays in memory indefinitely.
+
+        try:
+            # Sending an empty prompt preloads the model
+            self.client.generate(
+                model=self.model_name, 
+                prompt='', 
+                keep_alive=-1  # -1 keeps it in RAM forever
+            )
+            
+            #wake up bmo
+            self.face.set_state("idle")
+        except Exception as e:
+            print(f"[DEBUG] error on warmup: {e}")
+        
+# ================================================================================================================================
+                                                # BMOChat Tools, Modes, and Tool Handler
+# ================================================================================================================================
+
     def web_search(self, query: str) -> str:
         #Perform web search using Duck duck go web search tool
                 # 'us-en' region is often more stable for CLI queries
@@ -60,6 +219,43 @@ class BMOChat:
             print(f"[DEBUG] Search Error: {e}", flush=True)
             return "SEARCH_ERROR"
 
+    def summarize_web_data(self, user_input, web_result): 
+        enhanced_prompt = f"""
+                User asked: {user_input} 
+                Web result: {web_result}
+                
+                Summarize the results for the users request. DO NOT RETURN JSON.
+                 """
+        
+        messages = self.conversation_history + [
+            {'role': 'user', 'content': enhanced_prompt}
+            ]
+           
+        # Get response from BMO
+        raw_response = self.client.chat(
+        model=self.model_name,
+        messages=messages,
+            )
+            
+        response = raw_response['message']['content']
+
+        # Update conversation history
+        self.conversation_history.append({'role': 'assistant', 'content': response})
+        
+        return response
+    
+    def handle_mode_change(self, mode): #__________________add voice lines 
+        if mode == "study":
+            print("placeholder for running study mode")
+        
+        elif mode == "gaming":
+            print("placeholder for gaming mode")
+            
+        elif mode == "idle": 
+            print("placeholder for idle mode")
+            
+        return f"Initiating {mode} mode"
+
     def get_time(self):
         # Returns a string like 'Mon Mar 9 13:45:00 2026'
         # get pacific timezone data
@@ -68,44 +264,10 @@ class BMOChat:
         current_pacific_time = datetime.now(tz=pacific_tz)
         # return as a string
         return current_pacific_time.strftime("%I:%M %p on %A, %B %d")
-        
-    def ask_bmo(self, user_input: str) -> str:
-        self.conversation_history.append({'role': 'user', 'content': user_input})
-
-        try:
-            # Get the first response (could be text or a JSON tool request)
-            stream = self.client.chat(
-                model=self.model_name,
-                messages=self.conversation_history,
-                stream=True, 
-            )
-
-            full_response = ""
-            
-            for chunk in stream:
-                content = chunk.message.content
-                full_response += content
-                
-                print(content, end="", flush=True)
-                self.process_for_tts(content)
-
-            # Flush any remaining text in the buffer
-            self.process_for_tts("", final=True)
-            self.conversation_history.append({'role': 'assistant', 'content': full_response})
-            
-            # Check for JSON
-            action, value = self.handle_json_from_bmo(full_response)
-            
-            # If BMO asked for a tool, execute it
-            if action:
-                self.handle_tool_request(action, value, user_input)
-
-        except Exception as e:
-            print(f"\n[DEBUG] error in ask_bmo: {str(e)}")
 
     def handle_tool_request(self, action, value, user_input):
-        
         #Routes the action to the correct tool and handles the follow-up.
+        
         if action == "get_time":
             response = f"It is currently {self.get_time()}!"
             print(f"\n {response}")
@@ -113,7 +275,7 @@ class BMOChat:
             self.conversation_history.append({'role': 'assistant', 'content': response})
 
         elif action == "search_web":
-            # search_web now returns raw data, summarize_web_data handles the TTS
+            # search_web returns raw data, summarize_web_data prompts the llm again
             search_data = self.web_search(value)
             response = self.summarize_web_data(user_input, search_data)
             print(f"\n {response}")
@@ -146,8 +308,14 @@ class BMOChat:
             print(f"\n {value}")
             self.process_for_tts(value, final=False)
             self.conversation_history.append({'role': 'assistant', 'content': value})
+            
+# ================================================================================================================================
+                                                # BMOChat Piper TTS Functions
+# ================================================================================================================================
 
     def process_for_tts(self, chunk, final=False):
+        #takes raw text, prepares it and adds it to tts queue---is used to send any and all text to tts queue
+        
         # Check for the start of JSON
         if "{" in chunk:
             self.mute_tts = True
@@ -187,14 +355,18 @@ class BMOChat:
             self.tts_queue.put(clean_text)
         
     def _tts_worker(self):
-        #Background worker that consumes the queue and speaks.
-        # Setup the audio stream (Piper low models are usually 22050Hz)
+        #Background thread that consumes the queue and speaks.
+        
+        # Setup the audio stream
         with sd.RawOutputStream(samplerate=24500, blocksize=2048, channels=1, dtype='int16') as stream:
             while not self.stop_tts.is_set():
                 try:
                     # Wait for a sentence from the queue
                     text = self.tts_queue.get(timeout=1)
                     if text is None: break
+                    
+                    # TRIGGER: Start Talking
+                    self.face.set_state("talking")
                     
                     # Open Piper as a subprocess
                     # Inside _tts_worker:
@@ -221,130 +393,65 @@ class BMOChat:
                     
                     process.wait()
                     self.tts_queue.task_done()
+                    
+                    # TRIGGER: Back to Idle if nothing else is waiting
+                    if self.tts_queue.empty():
+                        self.face.set_state("idle")
+                        
                 except queue.Empty:
                     continue
-
-    def handle_json_from_bmo(self, raw_text: str):
-    # Parses BMO's output and extracts the core tool data.
-        # print("[DEBUG] in json handler:", raw_text)
-        try:
-            # Find the actual JSON block (ignores extra brackets or preamble text)
-            match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
-            if not match:
-                return None, None
-            
-            json_str = match.group(1).strip()
-            
-            # Fix common "extra bracket" or "trailing comma" issues
-            # Remove trailing commas before a closing bracket
-            json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
-            
-            # Attempt to parse
-            data = json.loads(json_str)
-            return data.get("action"), data.get("value")
-        
-        except Exception as e:
-            print(f"[DEBUG] Error parsing json: {e}")
-            return None, None
-    
-    def handle_mode_change(self, mode): #__________________add voice lines 
-        if mode == "study":
-            print("placeholder for running study mode")
-        
-        elif mode == "gaming":
-            print("placeholder for gaming mode")
-            
-        elif mode == "idle": 
-            print("placeholder for idle mode")
-            
-        return f"Initiating {mode} mode"
-
-    def summarize_web_data(self, user_input, web_result): 
-        enhanced_prompt = f"""
-                User asked: {user_input} 
-                Web result: {web_result}
                 
-                Summarize the results for the users request.
-                 """
-        
-        messages = self.conversation_history + [
-            {'role': 'user', 'content': enhanced_prompt}
-            ]
-           
-        # Get response from BMO
-        raw_response = self.client.chat(
-        model=self.model_name,
-        messages=messages,
-            )
-            
-        response = raw_response['message']['content']
+# ================================================================================================================================
+                                                # MAIN: INITIATES BMO CHAT AND FACE on startup
+# ================================================================================================================================
 
-        # Update conversation history
-        self.conversation_history.append({'role': 'assistant', 'content': response})
-        
-        return response
-     
-    def warmup(self):
-        #Loads the model into RAM by sending an empty request. 
-        #The keep_alive=-1 ensures it stays in memory indefinitely.
-
-        try:
-            # Sending an empty prompt preloads the model
-            self.client.generate(
-                model=self.model_name, 
-                prompt='', 
-                keep_alive=-1  # -1 keeps it in RAM forever
-            )
-        except Exception as e:
-            print(f"[DEBUG] error on warmup: {e}")
-        
 def main():
+    root = tk.Tk()
     
-    print("\nBMO OS v0.69")
-    print("BMO: (Type 'quit', 'exit', 'bye', or power off to power down BMO)")
-   
-    bmo = BMOChat()
-    #to reduce lag send an empty prompt to ai
+    face = BMOFace(root)
+    
+    bmo = BMOChat(face) 
+    
     bmo.warmup()
     
+    # Start thread for terminal input
+    input_thread = threading.Thread(target=terminal_input_thread, args=(bmo,), daemon=True)
+    input_thread.start()
+    root.mainloop()
+
+def terminal_input_thread(bmo_chat):
+    # input() on a thread so GUI doesn't freeze
+    print("\nBMO OS v0.69")
+    print("BMO: (Type 'quit', 'exit', 'bye', or power off to power down BMO)")
     while True:
         try:
-            # Get user input
             user_input = input("\nYou: ").strip()
-            
-            # Check for exit conditions
-            if user_input.lower() in ['quit', 'exit', 'bye', 'power off']:
-                print("\nPowering Off")
-                bmo.stop_tts.set() # Tells the worker to stop looping
-                bmo.tts_queue.put(None) # Unblocks the .get() if it's waiting
-                break
-            
-            if not user_input:
-                continue
-            
-            # Get BMO's response
-            print("\nBMO: ", end="", flush=True)
-            bmo.ask_bmo(user_input)
-            
-        except Exception as e:
-            print(f"\n[DEBUG] something went wrong in main(): {str(e)}")
+            if user_input.lower() in ['quit', 'exit', 'bye']:
+                os._exit(0) # Kill everything
+            if user_input:
+                print("\nBMO: ", end="", flush=True)
+                bmo_chat.ask_bmo(user_input)
+        except EOFError:
             break
-
-if __name__ == "__main__":
+        
+if __name__ == "__main__":  
     main()
+   
  
   
-#teach bmo how to change boolean states and how to exit them
-#idle
+
+
 #game
 #study
-#chat
+
 
 #take photo
 #canvas api
 #spotify api
 
-#ADD VOICE ASAP
+
 #how to go back to bmo if gaming
-#change faces
+
 #take photo with laptop camera
+
+#ALARM CLOCK STATE
