@@ -3,59 +3,102 @@ from PIL import Image, ImageTk
 import os
 import random
 
-class BMOAnimationTest:
+class BMOFace:
     def __init__(self, root):
         self.root = root
-        self.root.title("BMO Animation Sandbox")
-        self.root.geometry("500x400")
-        self.root.configure(bg='#73AF9C') # BMO Teal
-
-        # 1. Setup Canvas
-        self.canvas = tk.Canvas(root, width=500, height=400, bg='#73AF9C', highlightthickness=0)
-        self.canvas.pack()
-
-        # 2. Load Images from your folder
-        self.frames = self.load_images("assets/thinking")
+        self.root.title("BMO OS v1.0")
+        self.root.geometry("800x480")
         
-        if not self.frames:
-            print("Error: No images found in assets/thinking!")
-            return
-
-        # 3. Create the image object on the canvas
-        self.display_image = self.canvas.create_image(250, 200, image=self.frames[0])
+        # BMO Colors & Setup
+        self.bmo_color = "#73AF9C"
+        self.root.configure(bg=self.bmo_color)
         
-        # 4. Start the animation loop
-        self.update_animation()
+        self.canvas = tk.Canvas(self.root, width=800, height=480, bg=self.bmo_color, highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
 
-    def load_images(self, path):
-        """Loads all images from a directory and converts them for Tkinter."""
-        images = []
+        # 1. Initialize Animation Library
+        # This loads all folders inside /assets/
+        self.animations = {
+            "idle": self.load_frames("idle"),
+            "talking": self.load_frames("talking"),
+            "thinking": self.load_frames("thinking")
+        }
+
+        # 2. Set Starting State
+        self.current_state = "idle"
+        
+        # 3. Create the Face Sprite in the center
+        # We start with the first frame of 'idle'
+        if self.animations["idle"]:
+            self.face_sprite = self.canvas.create_image(400, 240, image=self.animations["idle"][0])
+        else:
+            # Fallback if idle is empty
+            self.face_sprite = self.canvas.create_image(800, 480)
+            print("Warning: 'assets/idle' is empty!")
+
+        # 4. Bind keys for manual testing
+        self.root.bind("1", lambda e: self.set_state("idle"))
+        self.root.bind("2", lambda e: self.set_state("talking"))
+        self.root.bind("3", lambda e: self.set_state("thinking"))
+        self.root.bind("<Escape>", lambda e: self.root.destroy())
+
+        print("Controls: Press 1 (Idle), 2 (Talking), 3 (Thinking)")
+        
+        # 5. Kick off the animation loop
+        self.animate()
+
+    def load_frames(self, folder_name):
+        """Helper to find, resize, and convert images to Tkinter format."""
+        frames = []
+        path = os.path.join("assets", folder_name)
+        
         if os.path.exists(path):
-            files = [f for f in os.listdir(path) if f.endswith(('.png', '.jpg', '.jpeg'))]
-            for f in sorted(files):
-                full_path = os.path.join(path, f)
-                img = Image.open(full_path)
-                # Resize to fit the screen
-                img = img.resize((300, 300), Image.Resampling.LANCZOS)
-                images.append(ImageTk.PhotoImage(img))
-        return images
+            files = sorted([f for f in os.listdir(path) if f.endswith(('.png', '.jpg', '.jpeg'))])
+            for f in files:
+                try:
+                    img = Image.open(os.path.join(path, f))
+      
+                    frames.append(ImageTk.PhotoImage(img))
+                except Exception as e:
+                    print(f"Error loading {f}: {e}")
+        return frames
 
-    def update_animation(self):
-        """Picks a random frame and schedules the next update."""
-        # Pick a random frame from our list
-        new_frame = random.choice(self.frames)
-        
-        # Update the canvas image
-        self.canvas.itemconfig(self.display_image, image=new_frame)
-        
-        # IMPORTANT: Keep a reference to the image so Python doesn't delete it
-        self.current_img = new_frame
+    def set_state(self, new_state):
+        """Change BMO's current emotion."""
+        if new_state in self.animations and self.animations[new_state]:
+            print(f"BMO State -> {new_state}")
+            self.current_state = new_state
+        else:
+            print(f"Error: Folder for '{new_state}' is missing or empty.")
 
-        # Schedule this function to run again in 200ms (0.2 seconds)
-        # Change 200 to something else to speed up or slow down
-        self.root.after(200, self.update_animation)
+    def animate(self):
+        """The core loop that picks a random frame and schedules the next one."""
+        # Get the list of frames for whatever state BMO is in right now
+        current_frames = self.animations.get(self.current_state, [])
+
+        if current_frames:
+            # Pick a random frame from the active list
+            next_image = random.choice(current_frames)
+            
+            # Update the canvas sprite
+            self.canvas.itemconfig(self.face_sprite, image=next_image)
+            
+            # Keep reference to prevent garbage collection
+            self.current_img_ref = next_image
+
+        # Adjust the speed of the 'heartbeat' based on the state
+        if self.current_state == "talking":
+            delay = random.randint(100, 250)
+        elif self.current_state == "thinking":
+            delay = random.randint(200, 400)
+        else: # Idle
+            delay = random.randint(2000, 4000)
+
+        # Schedule this function to run again
+        self.root.after(delay, self.animate)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = BMOAnimationTest(root)
+    app = BMOFace(root)
     root.mainloop()
+    

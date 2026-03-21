@@ -13,6 +13,8 @@ from ddgs import DDGS
 import tkinter as tk
 from PIL import Image, ImageTk
 import random
+import speech_recognition as sr
+import whisper
 
 
 # ================================================================================================================================
@@ -81,7 +83,7 @@ class BMOFace:
             delay = 2000
         
         self.root.after(delay, self.animate)
-        
+    
 # ================================================================================================================================
                                     # BMOChat Class: Handles Ollama, User Inputs, and TTS Queue
 # ================================================================================================================================
@@ -89,12 +91,19 @@ class BMOFace:
 class BMOChat:
     def __init__(self, face_canvas, model_name: str = "json_llama_bmo"):
         
+        #face initialization
         self.face = face_canvas     
+        
+        #listening/transcribing initialization
+        self.recognizer = sr.Recognizer()
+        self.recognizer.pause_threshold = 1.0
+        self.stt_model = whisper.load_model("base")
+        self.is_processing_audio = False
+        
+        # llm initialization
         self.model_name = model_name
         self.client = ollama.Client()
         self.conversation_history = []
-        
-        # Get the absolute path of the current script (llm/bmo_companion.py)
         current_dir = os.path.dirname(os.path.abspath(__file__))
 
         # Go up one level to project root, then into the piper folder
@@ -224,7 +233,7 @@ class BMOChat:
                 User asked: {user_input} 
                 Web result: {web_result}
                 
-                Summarize the results for the users request. DO NOT RETURN JSON.
+                Use the web result to answer the users request. DO NOT RETURN JSON.
                  """
         
         messages = self.conversation_history + [
@@ -397,10 +406,50 @@ class BMOChat:
                     # TRIGGER: Back to Idle if nothing else is waiting
                     if self.tts_queue.empty():
                         self.face.set_state("idle")
+                        self.is_processing_audio = False
                         
                 except queue.Empty:
                     continue
+# ================================================================================================================================
+                                                # BMOChat Listen and Trasnscribe Functions
+# ================================================================================================================================
+    def start_listening(self, event=None):
+        # change the face
+        if self.is_processing_audio:
+            return # Don't start a new listening thread
+            
+        self.is_processing_audio = True
+        
+        self.face.set_state("thinking")
+        
+        # Start the Listening Thread
+        threading.Thread(target=self.listen_and_transcribe, daemon=True).start()     
+    
+    def listen_and_transcribe(self):
+        try:
+            with sr.Microphone(sample_rate=16000) as source:
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                audio = self.recognizer.listen(source, timeout=10)
                 
+                #Conversion
+                raw_data = audio.get_raw_data(convert_rate=16000, convert_width=2)
+                audio_float32 = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
+
+                result = self.stt_model.transcribe(audio_float32, fp16=False)
+                user_text = result['text'].strip()
+
+                if user_text:
+                    print(f"[DEBUG] Text: {user_text}")
+                    self.ask_bmo(user_text)
+                else:
+                    self.face.set_state("idle")
+                    self.is_processing_audio = False
+                    
+        except Exception as e:
+            print(f"[DEBUG] Voice Error: {e}")
+            self.face.set_state("idle")
+            self.is_processing_audio = False
+
 # ================================================================================================================================
                                                 # MAIN: INITIATES BMO CHAT AND FACE on startup
 # ================================================================================================================================
@@ -414,15 +463,18 @@ def main():
     
     bmo.warmup()
     
+    root.bind("<space>", bmo.start_listening)
+    
+    print("\nBMO OS v0.69")
+    print("Type 'quit', 'exit', 'bye', or power off to power down BMO")
+    print("Press space to talk to BMO")
+    
     # Start thread for terminal input
-    input_thread = threading.Thread(target=terminal_input_thread, args=(bmo,), daemon=True)
-    input_thread.start()
     root.mainloop()
 
 def terminal_input_thread(bmo_chat):
     # input() on a thread so GUI doesn't freeze
-    print("\nBMO OS v0.69")
-    print("BMO: (Type 'quit', 'exit', 'bye', or power off to power down BMO)")
+    
     while True:
         try:
             user_input = input("\nYou: ").strip()
@@ -437,21 +489,15 @@ def terminal_input_thread(bmo_chat):
 if __name__ == "__main__":  
     main()
    
- 
-  
-
-
 #game
 #study
-
 
 #take photo
 #canvas api
 #spotify api
 
-
 #how to go back to bmo if gaming
-
 #take photo with laptop camera
-
 #ALARM CLOCK STATE
+
+#add thinking voice lines

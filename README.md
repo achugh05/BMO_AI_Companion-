@@ -7,7 +7,14 @@ Setup:
 
    pip install -r requirements.txt
 
+   install ollama from their website
+
+   then run:
    Ollama create json_llama_bmo -f ./Modelfile
+   to create bmo
+
+   sudo apt update
+   sudo apt install -y ffmpeg libportaudio2 python3-pyaudio python3-tk
 
    install en_US-libritts_r-medium.onnx and en_US-libritts_r-medium.onnx.json from piper_tts github 
 
