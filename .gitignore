@@ -4,3 +4,7 @@ __pycache__/
 study_focus_imx500/logs/*.html
 *.onnx
 piper/
+bmo_env/
+__pycache__/
+*.pyc
+.DS_Store
