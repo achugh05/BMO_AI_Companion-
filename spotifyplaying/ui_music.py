@@ -15,8 +15,8 @@ browser_proc = None
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-this-in-real-use")
 
-SPOTIFY_CLIENT_ID = "054426f64d6b493884c2d9938db8227c"
-SPOTIFY_CLIENT_SECRET = "5dec847ad0fa4348ac830a4a8544a073"
+SPOTIFY_CLIENT_ID = "EnterClientID"
+SPOTIFY_CLIENT_SECRET = "EnterClientSecret"
 SPOTIFY_REDIRECT_URI = "http://127.0.0.1:5000/callback"
 SPOTIFY_MARKET = "VN"
 
