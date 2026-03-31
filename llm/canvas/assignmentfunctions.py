@@ -38,7 +38,7 @@ def get_assignments(days_ahead, course_list=courses):
                 #If due date is within time period add to dictonary
                 if now <= due_date <= future_date:
                     upcoming_tasks.append({
-                        'course': " ".join(course.name[:10].upper().replace("_O", "").replace(" ", "")),
+                        'course': " ".join(course.name.upper().replace(" ", "")),
                         'assignment': assignment.name,
                         'due_date': local_due_date.strftime("%B %d, %H %M")
                     })
