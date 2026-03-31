@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+study_focus_imx500/logs/*.html
+*.onnx
+piper/
