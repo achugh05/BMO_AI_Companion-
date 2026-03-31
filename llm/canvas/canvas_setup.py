@@ -17,6 +17,7 @@ for course in courses:
     if hasattr(course, 'name'):
         #Take course code
         course_code = course.name
+        #Recommend to take only the first part of the course name so that it only takes the course code (makes it easier to call)
         clean_course_code = course_code.upper().replace(" ", "")
         coursedict[clean_course_code] = course
 
