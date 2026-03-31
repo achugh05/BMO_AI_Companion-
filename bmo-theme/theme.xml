@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<theme>
+
+    <view name="system">
+        
+        <image name="background">
+            <pos>0 0</pos>
+            <size>1 1</size>
+            <path>./_inc/bg.png</path>
+            <zIndex>10</zIndex>
+        </image>
+
+        <systemstatus name="status">
+            <pos>0.95 0.05</pos> 
+            <color>113311</color> 
+        </systemstatus>
+
+        <animation name="arrow_left">
+            <path>./_inc/left_arrow.gif</path>
+            <pos>0.1 0.5</pos>
+            <maxSize>0.15 0.15</maxSize> <origin>0.5 0.5</origin>
+            <zIndex>50</zIndex> 
+        </animation>
+
+        <animation name="arrow_right">
+            <path>./_inc/right_arrow.gif</path>
+            <pos>0.9 0.5</pos>
+            <maxSize>0.15 0.15</maxSize> <origin>0.5 0.5</origin>
+            <zIndex>50</zIndex> 
+        </animation>
+        
+
+        <animation name="system_logo_bounce">
+            <path>./_inc/logos/${system.theme}.gif</path>
+            <pos>0.5 0.5</pos>
+            <maxSize>0.65 0.65</maxSize> 
+            <origin>0.5 0.5</origin>
+            <zIndex>50</zIndex>
+        </animation>
+
+        <carousel name="systemcarousel">
+            <type>horizontal wheel</type>
+            <pos>0 2</pos> <size>1 0.2</size>
+        </carousel>
+
+      
+        <sound name="scroll">
+            <path>./_sounds/boop.wav</path>
+        </sound>
+        <helpsystem name="help">
+            <pos>0 2</pos> 
+        </helpsystem>
+
+        <image name="change_system">
+            <path>./_inc/LR_DPAD.png</path>
+            <pos>0.05 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="change_system_text">
+            <text>SYSTEMS</text>
+            <pos>0.08 0.93</pos> <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+
+        <image name="bmo_select_icon">
+            <path>./_inc/BIG.png</path>
+            <pos>0.17 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="bmo_select_text">
+            <text>SELECT</text>
+            <pos>0.20 0.93</pos>
+            <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+        <image name="settings">
+            <path>./_inc/TRI.png</path>
+            <pos>0.28 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="bmo_settings_text">
+            <text>SETTINGS</text>
+            <pos>0.31 0.93</pos>
+            <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+    </view>
+    <view name="gamelist">
+
+        <systemstatus name="status">
+            <pos>0.95 0.05</pos> 
+            <color>113311</color> 
+        </systemstatus>
+        
+        <image name="background">
+            <pos>0 0</pos>
+            <size>1 1</size>
+            <path>./_inc/bg.png</path>
+            <zIndex>10</zIndex>
+        </image>
+
+        <textlist name="gamelist">
+            <pos>0.02 0.1</pos> 
+            <size>0.45 0.8</size> 
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.035</fontSize>
+            <primaryColor>184328</primaryColor> 
+            <secondaryColor>184328</secondaryColor> 
+            <selectorColor>7FC99C</selectorColor> 
+            <zIndex>50</zIndex> 
+        </textlist>
+
+       <image name="md_image">
+            <imageType>image</imageType> 
+            <default>./_inc/default_img.png</default>
+            <pos>0.5 0.1</pos>
+            <maxSize>0.5 0.5</maxSize>
+            <origin>0 0</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <image name="md_marquee">
+            <imageType>marquee</imageType>
+            <default>./_inc/default_logo.png</default>
+            <pos>0.52 0.61</pos>
+            <maxSize>0.15 0.1</maxSize>
+            <origin>0 0</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="md_description">
+            <metadata>description</metadata> <pos>0.68 0.6</pos>
+            <text>BMO is unable to read the game... I'm sure its really fun though!</text>
+            <size>0.27 0.3</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex> 
+        </text>
+
+        <datetime name="md_releasedate">
+            <metadata>releasedate</metadata>
+            <pos>0.53 0.85</pos>
+            <size>0.2 0.1</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <format>%Y</format> 
+            <zIndex>50</zIndex> 
+        </datetime>
+
+        <text name="md_genre">
+            <metadata>genre</metadata>
+            <text>BMO has no idea</text>
+            <pos>0.53 0.8</pos>
+            <size>0.2 0.1</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex> 
+        </text>
+
+        
+        <rating name="md_rating">
+            <pos>0.52 0.77</pos>
+            <size>0.15 0.05</size>
+            <filledPath>./_inc/filled_star.png</filledPath>
+            <unfilledPath>./_inc/empty_star.png</unfilledPath>
+        </rating>
+
+        <animation name="system_logo">
+            <path>./_inc/logos/${system.theme}.gif</path>
+            <pos>0.15 0.05</pos>
+            <maxSize>0.15 0.15</maxSize> <origin>0.5 0.5</origin>
+            <zIndex>50</zIndex>
+        </animation>
+    
+        <sound name="scroll">
+            <path>./_sounds/boop.wav</path>
+        </sound>
+
+        <helpsystem name="help">
+            <pos>0 2</pos> 
+        </helpsystem>
+
+        <image name="change_system">
+            <path>./_inc/LR_DPAD.png</path>
+            <pos>0.05 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="change_system_text">
+            <text>SYSTEMS</text>
+            <pos>0.08 0.93</pos> <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+
+        <image name="bmo_play_icon">
+            <path>./_inc/BIG.png</path>
+            <pos>0.17 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="bmo_play_text">
+            <text>PLAY</text>
+            <pos>0.20 0.93</pos>
+            <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+        <image name="settings">
+            <path>./_inc/TRI.png</path>
+            <pos>0.28 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="bmo_settings_text">
+            <text>SETTINGS</text>
+            <pos>0.31 0.93</pos>
+            <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+
+        <image name="game_icon">
+            <path>./_inc/UD_DPAD.png</path>
+            <pos>0.39 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="bmo_games_text">
+            <text>GAMES</text>
+            <pos>0.42 0.93</pos>
+            <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+
+        <image name="return">
+            <path>./_inc/SMALL.png</path>
+            <pos>0.50 0.95</pos>
+            <maxSize>0.04 0.04</maxSize>
+            <origin>0 0.5</origin>
+            <zIndex>50</zIndex>
+        </image>
+
+        <text name="bmo_return_text">
+            <text>RETURN</text>
+            <pos>0.53 0.93</pos>
+            <size>0.1 0.05</size>
+            <fontPath>./_fonts/aseprite.ttf</fontPath>
+            <fontSize>0.02</fontSize>
+            <color>184328</color>
+            <zIndex>50</zIndex>
+        </text>
+    </view>
+</theme>
