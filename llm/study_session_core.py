@@ -1,26 +1,26 @@
-import csv
-import os
-import time
-from collections import Counter
-from dataclasses import dataclass, field
-from datetime import datetime
+import csv #python built-in csv library
+import os #work with other folders
+import time # timing for study sessions
+from collections import Counter #how may times an events happended
+from dataclasses import dataclass, field #storing session data
+from datetime import datetime #timestaamps for start and end time
 from functools import lru_cache
 
-import cv2
+import cv2 #drawing boxes and labels 
 
-from picamera2 import MappedArray, Picamera2
+from picamera2 import MappedArray, Picamera2 #control camera and draw 
 from picamera2.devices import IMX500
 from picamera2.devices.imx500 import (
-    NetworkIntrinsics,
-    postprocess_nanodet_detection,
+    NetworkIntrinsics, #setting of AI model
+    postprocess_nanodet_detection, # model output -> detection boxes using NanoDet format
 )
 
-# Runtime globals used by Picamera2 callback flow
-last_detections = []
-last_results = None
-imx500 = None
-intrinsics = None
-picam2 = None
+# global parameters of the camera to use in draw_detections()
+last_detections = [] #store detections
+last_results = None #store most recent detections
+imx500 = None 
+intrinsics = None #model settings
+picam2 = None #camera controller
 
 
 # ---------------------------
@@ -33,29 +33,29 @@ SCORE_FACE_CLOSED = 20
 SCORE_NO_FACE = 0
 
 
-@dataclass
-class SessionAccumulator:
-    session_id: str
-    start_time_iso: str
-    duration_minutes: int
-    model_path: str
+@dataclass # class for storing data
+class SessionAccumulator: # object that monitor the study session
+    session_id: str # name of the section 
+    start_time_iso: str # timestamp
+    duration_minutes: int # session length
+    model_path: str # path to AI model 
 
-    total_frames: int = 0
-    score_sum: float = 0.0
-    primary_state_counts: Counter = field(default_factory=Counter)
-
-    face_open_present_frames: int = 0
+    total_frames: int = 0 # count how many frame processed
+    score_sum: float = 0.0 # sum score across all frame
+    primary_state_counts: Counter = field(default_factory=Counter) # each session gets a new counter
+    # how many frames contains each label
+    face_open_present_frames: int = 0 
     face_closed_present_frames: int = 0
     head_down_present_frames: int = 0
     phone_present_frames: int = 0
     no_face_frames: int = 0
 
     def add_frame(self, labels_present: set[str]) -> None:
-        primary_state, score = evaluate_frame(labels_present)
+        primary_state, score = evaluate_frame(labels_present) # get state and score for the frame from evaluate_frame()
 
-        self.total_frames += 1
-        self.score_sum += score
-        self.primary_state_counts[primary_state] += 1
+        self.total_frames += 1 # add frame to totale frame
+        self.score_sum += score # add score to total score
+        self.primary_state_counts[primary_state] += 1 # count occurance for the state
 
         if "face+eye-opened" in labels_present:
             self.face_open_present_frames += 1
@@ -68,15 +68,15 @@ class SessionAccumulator:
         if len(labels_present) == 0:
             self.no_face_frames += 1
 
-    def finalize(self) -> dict:
-        end_time_iso = datetime.now().isoformat(timespec="seconds")
-        average_score = self.score_sum / self.total_frames if self.total_frames else 0.0
-        dominant_state = (
+    def finalize(self) -> dict: #dictionary for the summary 
+        end_time_iso = datetime.now().isoformat(timespec="seconds") # get time when section ends
+        average_score = self.score_sum / self.total_frames if self.total_frames else 0.0 # cal avg score 
+        dominant_state = ( #find state with most occurance 
             self.primary_state_counts.most_common(1)[0][0]
             if self.primary_state_counts else "no_data"
         )
-        duration_seconds = self.duration_minutes * 60
-        approx_fps = self.total_frames / duration_seconds if duration_seconds > 0 else 0.0
+        duration_seconds = self.duration_minutes * 60 # min -> sec
+        approx_fps = self.total_frames / duration_seconds if duration_seconds > 0 else 0.0 # cal fps
 
         def pct(n: int) -> float:
             return (100.0 * n / self.total_frames) if self.total_frames else 0.0
@@ -109,14 +109,14 @@ class SessionAccumulator:
         }
 
 
-class Detection:
-    def __init__(self, coords, category, conf, metadata):
-        self.category = category
-        self.conf = conf
-        self.box = imx500.convert_inference_coords(coords, metadata, picam2)
+class Detection: # class to store detection
+    def __init__(self, coords, category, conf, metadata): 
+        self.category = category # class ID
+        self.conf = conf # confidence score
+        self.box = imx500.convert_inference_coords(coords, metadata, picam2) # box coordinates 
 
 
-def evaluate_frame(labels_present: set[str]) -> tuple[str, int]:
+def evaluate_frame(labels_present: set[str]) -> tuple[str, int]: #return score and state
     """
     Priority:
     phone > face+eye-closed > head-down > face+eye-opened > no_face
@@ -132,14 +132,14 @@ def evaluate_frame(labels_present: set[str]) -> tuple[str, int]:
     return "no_face", SCORE_NO_FACE
 
 
-def validate_session_minutes(session_minutes: int) -> int:
+def validate_session_minutes(session_minutes: int) -> int: #session time only allow increments by 5
     if session_minutes < 5 or session_minutes % 5 != 0:
         raise ValueError("session_minutes must be 5, 10, 15, ...")
     return session_minutes
 
 
 def ensure_summary_csv(csv_path: str) -> None:
-    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True) # csv exist and correct header
 
     if os.path.exists(csv_path):
         return
@@ -173,30 +173,30 @@ def ensure_summary_csv(csv_path: str) -> None:
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+        writer.writeheader() # first row with column names
 
 
-def append_summary_csv(csv_path: str, summary: dict) -> None:
+def append_summary_csv(csv_path: str, summary: dict) -> None: # add new sessions as new rows
     ensure_summary_csv(csv_path)
     with open(csv_path, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(summary.keys()))
         writer.writerow(summary)
 
 
-def parse_detections(metadata: dict, threshold: float, iou: float, max_detections: int):
+def parse_detections(metadata: dict, threshold: float, iou: float, max_detections: int): # filtering detections from model output
     global last_detections
 
     bbox_normalization = intrinsics.bbox_normalization
     bbox_order = intrinsics.bbox_order
 
-    np_outputs = imx500.get_outputs(metadata, add_batch=True)
+    np_outputs = imx500.get_outputs(metadata, add_batch=True) #get outputs from model 
     _, input_h = imx500.get_input_size()
 
     if np_outputs is None:
         return last_detections
 
-    if intrinsics.postprocess == "nanodet":
-        boxes, scores, classes = postprocess_nanodet_detection(
+    if intrinsics.postprocess == "nanodet": # post-processing fro nanodet format 
+        boxes, scores, classes = postprocess_nanodet_detection( 
             outputs=np_outputs[0],
             conf=threshold,
             iou_thres=iou,
@@ -205,16 +205,16 @@ def parse_detections(metadata: dict, threshold: float, iou: float, max_detection
         from picamera2.devices.imx500.postprocess import scale_boxes
         input_w, input_h = imx500.get_input_size()
         boxes = scale_boxes(boxes, 1, 1, input_h, input_w, False, False)
-    else:
+    else: # for non-nanodet format 
         boxes, scores, classes = np_outputs[0][0], np_outputs[1][0], np_outputs[2][0]
 
         if bbox_normalization:
             boxes = boxes / input_h
 
-        if bbox_order == "xy":
+        if bbox_order == "xy": # reorder the box coordinates 
             boxes = boxes[:, [1, 0, 3, 2]]
 
-    last_detections = [
+    last_detections = [ # filtered list of detections 
         Detection(box, category, score, metadata)
         for box, score, category in zip(boxes, scores, classes)
         if score > threshold
@@ -223,21 +223,21 @@ def parse_detections(metadata: dict, threshold: float, iou: float, max_detection
 
 
 @lru_cache
-def get_labels():
-    labels = intrinsics.labels
+def get_labels(): 
+    labels = intrinsics.labels # extracted class names 
     if intrinsics.ignore_dash_labels:
         labels = [label for label in labels if label and label != "-"]
     return labels
 
 
-def labels_present_from_detections(detections) -> set[str]:
+def labels_present_from_detections(detections) -> set[str]: #??
     labels = get_labels()
     found = set()
 
     for detection in detections:
         cls_idx = int(detection.category)
         if 0 <= cls_idx < len(labels):
-            found.add(str(labels[cls_idx]))
+            found.add(str(labels[cls_idx])) # add detected class into found set 
 
     return found
 
@@ -247,12 +247,12 @@ def draw_detections(request, stream="main"):
     if detections is None:
         return
 
-    labels = get_labels()
+    labels = get_labels() 
 
     with MappedArray(request, stream) as m:
         for detection in detections:
-            x, y, w, h = detection.box
-            label = f"{labels[int(detection.category)]} ({detection.conf:.2f})"
+            x, y, w, h = detection.box # get exact box coordinates
+            label = f"{labels[int(detection.category)]} ({detection.conf:.2f})" # text class name + confidence for preview 
 
             (text_width, text_height), baseline = cv2.getTextSize(
                 label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
@@ -261,7 +261,7 @@ def draw_detections(request, stream="main"):
             text_y = y + 15
 
             overlay = m.array.copy()
-            cv2.rectangle(
+            cv2.rectangle( # draw box
                 overlay,
                 (text_x, text_y - text_height),
                 (text_x + text_width, text_y + baseline),
@@ -291,7 +291,7 @@ def draw_detections(request, stream="main"):
             )
 
         if intrinsics.preserve_aspect_ratio:
-            b_x, b_y, b_w, b_h = imx500.get_roi_scaled(request)
+            b_x, b_y, b_w, b_h = imx500.get_roi_scaled(request) #get ROI 
             color = (255, 0, 0)
             cv2.putText(
                 m.array,
@@ -310,7 +310,7 @@ def draw_detections(request, stream="main"):
             )
 
 
-def run_study_session(
+def run_study_session( #calling function and variables need to be declared  
     model_path: str,
     labels_path: str | None,
     session_minutes: int = 5,
@@ -320,7 +320,7 @@ def run_study_session(
     bbox_normalization: bool = True,
     bbox_order: str = "xy",
     preserve_aspect_ratio: bool = True,
-    summary_csv: str = "/home/chuoidawy/study_focus_imx500/logs/study_session_summary.csv",
+    summary_csv: str = "",
     enable_study_ai: bool = True,
     fps: int | None = None,
 ) -> dict | None:
